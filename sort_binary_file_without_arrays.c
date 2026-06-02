@@ -62,7 +62,6 @@ void clear_word(word_t *word)
     word->size = 0;
 }
 
-/* Прочитать слово по индексу. */
 void read_word_at(uint16_t index, word_t *word, FILE *file)
 {
     (void)word;
@@ -123,42 +122,16 @@ void read_word_at(uint16_t index, word_t *word, FILE *file)
     word->seek_start = start_pos;
 }
 
-/* Меняет два слова местами. */
 void swap_words(word_t *word_a, word_t *word_b, FILE *file)
 {
-    // 1. Временно сохраняем данные слова B (включая '\0')
-    char *tmp = malloc(word_b->size);
-    if (!tmp) {
-        perror("swap_words malloc");
-        exit(1);
-    }
-    memcpy(tmp, word_b->data, word_b->size);
-
-    // 2. Записываем слово A на место B
-    fseek(file, word_b->seek_start, SEEK_SET);
-    fwrite(word_a->data, 1, word_a->size, file);
-
-    // 3. Записываем сохранённое слово B на место A
     fseek(file, word_a->seek_start, SEEK_SET);
-    fwrite(tmp, 1, word_b->size, file);
+    word_b->seek_start = ftell(file);
+    fwrite(word_b->data, sizeof(char), word_b->size, file);
 
-    free(tmp);
-
-    // 4. Обмениваем поля seek_start (позиции слов в файле)
-    size_t tmp_pos = word_a->seek_start;
-    word_a->seek_start = word_b->seek_start;
-    word_b->seek_start = tmp_pos;
-
-    // // 5. Обмениваем data и size, чтобы структуры соответствовали новому расположению
-    // char *tmp_data = word_a->data;
-    // size_t tmp_size = word_a->size;
-    // word_a->data = word_b->data;
-    // word_a->size = word_b->size;
-    // word_b->data = tmp_data;
-    // word_b->size = tmp_size;
+    word_a->seek_start = ftell(file);
+    fwrite(word_a->data, sizeof(char), word_a->size, file);
 }
 
-/* Потом поменять. Типо вот правила для сортировки. */
 int compare(const void *a, const void *b)
 {
     const word_t *na = (const word_t *)a;
@@ -179,7 +152,7 @@ void bubble_sort(uint16_t words_count, FILE *file, int (*cmp)(const void *a, con
             read_word_at(j, word_a, file);
             read_word_at(j + 1, word_b, file);
 
-            if (cmp(word_a, word_b) > 0) {
+            if (cmp(word_a, word_b) < 0) {
                 swap_words(word_a, word_b, file);
             }
         }
@@ -191,7 +164,6 @@ void bubble_sort(uint16_t words_count, FILE *file, int (*cmp)(const void *a, con
     free(word_b);
 }
 
-/* Точка входа в программу. */
 int main(int argc, char *argv[])
 {
     (void)argc;
@@ -210,21 +182,21 @@ int main(int argc, char *argv[])
         fclose(file);
     }
 
+    if (strcmp(argv[1], "test") == 0) {
+        FILE *file = fopen_or_exit(FILENAME, "rb+");
+        word_t *word = calloc(1, sizeof(word_t));
+
+        uint16_t count_words;
+        fread(&count_words, sizeof(count_words), 1, file);
+
+        for (int i = count_words - 1; i >= 0; i--) {
+            read_word_at((uint16_t)i, word, file);
+            printf("%s | %ld | %ld\n", word->data, word->size, word->seek_start);
+        }
+
+        free(word);
+        fclose(file);
+    }
+
     return 0;
 }
-
-/*
-char *tmp = malloc(word_b->size);
-memcpy(tmp, word_b->data, word_b->size);
-// пишем word_a на место word_b
-fseek(file, word_b->seek_start, SEEK_SET);
-fwrite(word_a->data, 1, word_a->size, file);
-// пишем tmp на место word_a
-fseek(file, word_a->seek_start, SEEK_SET);
-fwrite(tmp, 1, word_b->size, file);
-free(tmp);
-// обновляем seek_start в структурах (для корректности)
-long tmp_pos = word_a->seek_start;
-word_a->seek_start = word_b->seek_start;
-word_b->seek_start = tmp_pos;
-*/
