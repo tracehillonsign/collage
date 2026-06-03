@@ -16,9 +16,12 @@ void clear_word(word_t *word)
 
 void read_word_at(uint16_t index, word_t *word, FILE *file)
 {
-    (void)word;
-
     int ch;
+    int start_pos;
+    size_t capacity = 16;
+    size_t len = 0;
+    char *buffer = NULL;
+    char *newbuffer = NULL;
 
     if (word->data) {
         clear_word(word);
@@ -32,46 +35,46 @@ void read_word_at(uint16_t index, word_t *word, FILE *file)
         }
 
         if (ch == EOF) {
-            clear_word(word);
-            return;
+            goto clean;
         }
     }
 
-    int start_pos = ftell(file);
+    start_pos = ftell(file);
     if (start_pos == -1) {
-        clear_word(word);
-        return;
+        goto clean;
     }
 
-    size_t capacity = 16;
-    size_t len = 0;
-    char *buffer = malloc(capacity);
+    buffer = malloc(capacity);
     if (!buffer) {
         perror("[read_word_at] malloc: ");
-        exit(1);
+        goto clean;
     }
 
     while ((ch = fgetc(file)) != EOF) {
         if (len + 1 >= capacity) {
             capacity *= 2;
-            char *newbuffer = realloc(buffer, capacity);
+            newbuffer = realloc(buffer, capacity);
             if (!newbuffer) {
-                free(buffer);
                 perror("[read_word_at] realloc: ");
-                exit(2);
+                goto clean;
             }
             buffer = newbuffer;
         }
 
         buffer[len++] = (char)ch;
-        if (ch == '\0') {
+        if (ch == '\0')
             break;
-        }
     }
 
     word->data = buffer;
     word->size = len;
     word->seek_start = start_pos;
+    return;
+
+clean:
+    free(buffer);
+    clear_word(word);
+    return;
 }
 
 void swap_words(word_t *word_a, word_t *word_b, FILE *file)
